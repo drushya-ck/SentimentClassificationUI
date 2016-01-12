@@ -6,6 +6,9 @@
 
 package sentimentclassificationui;
 
+import gui.SentimentClassificationMainFrame;
+
+
 /**
  *
  * @author Wai Nwe Tun
@@ -17,11 +20,8 @@ public class SentimentClassificationUI {
      */
     public static void main(String[] args) {
         // TODO code application logic here
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new SentimentClassificationJFrame().setVisible(true);
-            }
-        });
+        SentimentClassificationMainFrame frame = new SentimentClassificationMainFrame();
+        frame.show();
     }
     
 }
