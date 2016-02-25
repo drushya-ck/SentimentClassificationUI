@@ -12,38 +12,51 @@ package train;
  */
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.sql.DriverManager;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Scanner;
 import java.util.Set;
-import com.mysql.jdbc.Connection;
-import com.mysql.jdbc.Statement;
+import model.InfoGainFeature;
+import preprocess.Preprocessing;
+import service.DatabaseBuilder;
+import service.QueryManager;
 
 public class InformationGainCalculation {
     private Set<String> allSet;
     private HashMap<String, Integer> posFeatures;
     private HashMap<String, Integer> negFeatures;
-    private boolean isPos;
+    public int isPos ;
    
     
-    public InformationGainCalculation(boolean isPos){
+    public InformationGainCalculation(int isPos){
         allSet = new HashSet<>();
         posFeatures = new HashMap<>();
         negFeatures = new HashMap<>();
         this.isPos = isPos;
+        this.preprocess();
         this.negFeatureCounts();
         this.posFeatureCounts();
         
-        System.out.println("constructor");
+        System.out.println("IG: constructor");
     }
 
+    public void preprocess(){
+        
+        for(int i=0; i<1000; i++){
+            Preprocessing preprocessing1 = new Preprocessing();
+            Preprocessing preprocessing2 = new Preprocessing();
+            preprocessing1.posTagging("input_txt_sentoken/pos/cv"+i+".txt", "extracted_review/with_nouns/pos/cv"+i+".txt");
+            preprocessing2.posTagging("input_txt_sentoken/neg/cv"+i+".txt", "extracted_review/with_nouns/neg/cv"+i+".txt");
+        }
+        System.out.println("Extraction stage is completed!");
+    }
+    
     public void posFeatureCounts(){       
         for(int i=0; i<700; i++){
             Set<String> posSet = new HashSet<>();
             try{
-                Scanner scanner = new Scanner(new File("extracted_review/without_neg_hand/without_nouns/pos/cv" + i + ".txt"));			
+                Scanner scanner = new Scanner(new File("extracted_review/with_nouns/pos/cv" + i + ".txt"));			
                 //HashMap<String, Integer> tempMap = new HashMap<String, Integer>();
                 while(scanner.hasNext()){
                     String word = scanner.next();
@@ -71,7 +84,7 @@ public class InformationGainCalculation {
             }
         }
         System.out.print("pos features completed.");
-        if(isPos){
+        if(isPos==1){
             System.out.println("the new is pos");
             Set<String> posSet = new HashSet<>();
             try{
@@ -109,7 +122,7 @@ public class InformationGainCalculation {
         for(int i=0; i<700; i++){
             Set<String> negSet = new HashSet<>();
             try{
-                Scanner scanner = new Scanner(new File("extracted_review/without_neg_hand/without_nouns/neg/cv" + i + ".txt"));                
+                Scanner scanner = new Scanner(new File("extracted_review/with_nouns/neg/cv" + i + ".txt"));                
                 //HashMap<String, Integer> tempMap = new HashMap<String, Integer>();
                 while(scanner.hasNext()){
                     String word = scanner.next();
@@ -135,7 +148,7 @@ public class InformationGainCalculation {
                 }
             }
         }
-        if(!isPos){
+        if(isPos==-1){
             Set<String> negSet = new HashSet<>();
             try{
                 Scanner scanner = new Scanner(new File("review.txt"));
@@ -170,39 +183,17 @@ public class InformationGainCalculation {
     public String createTable(){
         System.out.println("creating table");
         System.out.println("pos" + posFeatures.size() + "neg " + negFeatures.size());
-        Connection con = null;
-        try{
-            Class.forName("com.mysql.jdbc.Driver");
-                    //System.out.println("OK");
-            con = (Connection) DriverManager.getConnection("jdbc:mysql://localhost:3306/MOVIE_REVIEW", "root", "root");
-            Statement statement = (Statement) con.createStatement();
-            statement.execute("DELETE FROM TRAIN_FEATURES;");
-            statement.close();
-            for(String feature: allSet){
-                int pos = (posFeatures.containsKey(feature))? posFeatures.get(feature) : 0;
-                int neg = (negFeatures.containsKey(feature))? negFeatures.get(feature) : 0;
-                int revPos = 700 - pos;
-                int revNeg = 700 - neg;
-                double gain = calculateInformationGain(pos, neg, revPos, revNeg);
-
-                statement = (Statement) con.createStatement();
-                statement.execute("INSERT INTO TRAIN_FEATURES (FEATURE, COUNT_IN_POSITIVE, COUNT_IN_NEGATIVE, COUNT_NOT_IN_POSITIVE, COUNT_NOT_IN_NEGATIVE, GAIN) VALUES ('" + feature + "',"  + pos+ "," + neg + ","+ revPos +","+ revNeg+","+ gain +");");
-                statement.close();
-            }
-        }
-        catch(Exception ex){
-                    System.out.println(ex.getMessage());
-            }
-            finally{
-                try{
-                    if(con!=null){
-                        con.close();
-                    }
-                }
-                catch(Exception ex){
-                    System.out.println(ex.getMessage());
-                }
-            }
+        
+        DatabaseBuilder.createInfoGainTable();
+        for(String feature: allSet){
+            int pos = (posFeatures.containsKey(feature))? posFeatures.get(feature) : 0;
+            int neg = (negFeatures.containsKey(feature))? negFeatures.get(feature) : 0;
+            int revPos = 700 - pos;
+            int revNeg = 700 - neg;
+            double gain = calculateInformationGain(pos, neg, revPos, revNeg);
+            
+            QueryManager.insertNewFeaturesInfoGain(new InfoGainFeature(feature, pos, neg, gain));                       
+        }        
         return "Features have been successfully calculated using Information Gain.";
     }
 	

@@ -62,12 +62,12 @@ public class Extraction {
                     boolean flag = false;
                     char charFlag = ' ';
                     String tag = tSentence.get(j).tag();
-                    /*
+                    
                     if(tag.equals("NN") || tag.equals("NNS")){	// noun
                         flag = true;
 
                     }
-                    */
+                    
                     if(tag.equals("VBP") || tag.equals("VBZ") || tag.equals("VB") || tag.equals("VBD") || tag.equals("VBN")){	//verb
                         flag = true;
                         charFlag = 'v';

@@ -5,6 +5,7 @@
  */
 package gui;
 
+import classify.Classification;
 import java.awt.BorderLayout;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -19,6 +20,7 @@ public class SentimentClassificationMainFrame extends JFrame{
     private JPanel trainingPanel;
     private JPanel classifyPanel;
     private JFrame mainFrame;
+    private Classification classify;
     
     public SentimentClassificationMainFrame(){
         mainFrame = new JFrame("Sentiment Classification");
@@ -32,6 +34,7 @@ public class SentimentClassificationMainFrame extends JFrame{
         mainFrame.pack();
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         mainFrame.setLocationRelativeTo(null);
+        classify = new Classification();
     }
     
     public void show(){

@@ -8,10 +8,11 @@ package classify;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.Statement;
 import java.util.Scanner;
+import model.TrainReview;
+import preprocess.Preprocessing;
+import service.DatabaseBuilder;
+import service.QueryManager;
 
 /**
  *
@@ -20,18 +21,41 @@ import java.util.Scanner;
 public class AllClassification {
     private StringBuilder result;
     private BernoulliNB nb;
+    private int true_pos = 0;
+    private int true_neg = 0;
+    
     public AllClassification(){
         result = new StringBuilder();
         this.prepareTable();
         nb = new BernoulliNB();       
     }
     
+    public String evaluate(){
+        int false_pos = 300 - true_pos;
+        int false_neg = 300 - true_neg;
+        System.out.println(true_pos + "  " + true_neg + "  " + false_pos + " " + false_neg);
+
+        double accruacy = (double)(true_pos + true_neg)/(true_pos + false_pos + true_neg + false_neg);
+        double recall_pos = (double) true_pos/ (true_pos + false_neg);
+        double recall_neg = (double) true_neg/ (true_neg + false_pos);
+        double precision_pos = (double) true_pos/(true_pos + false_pos);
+        double precision_neg = (double) true_neg/ (true_neg + false_neg);
+        
+        result.append("Accuracy : " + accruacy);
+        result.append("\nRecall_pos : " + recall_pos);
+        result.append("\nRecall_neg : " + recall_neg);
+        result.append("\nPrecision_pos : " + precision_pos);
+        result.append("\nPrecision_neg : " + precision_neg);
+        return result.toString();
+    }
+    
     public void classify(){
+        nb.trainBernoulliNB();
         for(int i=700; i<1000; i++){
             
             StringBuilder review = new StringBuilder();
             try{            
-                Scanner scanner = new Scanner(new File("extracted_review/without_neg_hand/without_nouns/pos/cv" + i + ".txt"));
+                Scanner scanner = new Scanner(new File("extracted_review/with_nouns/pos/cv" + i + ".txt"));
                 while(scanner.hasNext()){
                     review.append(scanner.next() + " ");
                 }
@@ -40,9 +64,12 @@ public class AllClassification {
             catch(FileNotFoundException ex){
                 System.err.println(ex.getMessage());
             }
-            nb.applyBernoulliNB(review.toString());
+            //System.out.println(review.toString());
+            double[] temp = nb.applyBernoulliNB(review.toString());
+            System.out.println(temp[0] + "..");
             this.savingBits("p"+i, nb.getScore()[0], nb.getScore()[1]);
             if(nb.getScore()[0]>nb.getScore()[1]){
+                true_pos ++;
                 result.append(" This cv" + i +" review (positive) has a positive sentiment.\n");
             }
             else if(nb.getScore()[0]<nb.getScore()[1]){
@@ -56,7 +83,7 @@ public class AllClassification {
             
             StringBuilder review = new StringBuilder();
             try{            
-                Scanner scanner = new Scanner(new File("extracted_review/without_neg_hand/without_nouns/neg/cv" + i + ".txt"));
+                Scanner scanner = new Scanner(new File("extracted_review/with_nouns/neg/cv" + i + ".txt"));
                 while(scanner.hasNext()){
                     review.append(scanner.next() + " ");
                 }
@@ -71,6 +98,7 @@ public class AllClassification {
                 result.append(" This cv" + i +" review (negative) has a positive sentiment.\n");
             }
             else if(nb.getScore()[0]<nb.getScore()[1]){
+                true_neg ++;
                 result.append(" This cv" + i +" review (negative) has a negative sentiment.\n");
             }
             else{
@@ -80,74 +108,23 @@ public class AllClassification {
     }  
     
     public void savingBits(String index, double pos, double neg){
-		int classVar = 0;
+		String  sentiment = "ambiguious";
 		if(pos<neg){
-			classVar = -1;
+                    sentiment = "negative";
 		}
 		else if(pos>neg){
-			classVar = 1;
+                    sentiment = "positive";
 		}
-		      Connection con = null;
-		try{
-			Class.forName("com.mysql.jdbc.Driver");
-			//System.out.println("OK");
-			con = (Connection) DriverManager.getConnection("jdbc:mysql://localhost:3306/MOVIE_REVIEW", "root", "root");
-			System.out.println("connection ok");
-			
-			                 Statement statement = (Statement)con.createStatement();
-			statement.executeUpdate("UPDATE TRAIN_TEST_RESULT SET POS_BIT = " + pos + ", NEG_BIT = " + neg + ", CLASS = " + classVar  +" WHERE REVIEW = '" + index + "';");
-			statement.close();							
-		}
-		catch(Exception ex){
-			System.out.println(ex.getMessage());
-		}
-		finally{
-			try{
-				if(con!=null){
-					con.close();
-				}
-			}
-			catch(Exception ex){
-				System.out.println(ex.getMessage());
-			}
-		}
+                TrainReview temp = new TrainReview(index, pos, neg, sentiment);
+                //System.out.println(temp.getTotal_pos_bits() +" " +temp.getTotal_neg_bits());
+                int success = QueryManager.insertNewTrainReview(temp);
+                if(success==0){
+                    System.err.println("Cannot insert a review into TrainReview");
+                }		
 
 	}
 	public static void prepareTable(){
-		Connection con = null;
-		try{
-			Class.forName("com.mysql.jdbc.Driver");
-			//System.out.println("OK");
-			con = (Connection) DriverManager.getConnection("jdbc:mysql://localhost:3306/MOVIE_REVIEW", "root", "root");
-			System.out.println("connection ok");
-			Statement s = (Statement)con.createStatement();
-                        s.executeUpdate("DELETE FROM TRAIN_TEST_RESULT;");
-                        s.close();
-			for(int i= 700; i<1000; i++){
-				Statement statement = (Statement) con.createStatement();
-				statement.executeUpdate("INSERT INTO TRAIN_TEST_RESULT (REVIEW) VALUES ('p" + i + "');");				
-				statement.close();
-			}
-			for(int i= 700; i<1000; i++){
-				Statement statement = (Statement) con.createStatement();
-				statement.executeUpdate("INSERT INTO TRAIN_TEST_RESULT(REVIEW) VALUES ('n" + i + "');");				
-				statement.close();
-			}
-							
-		}
-		catch(Exception ex){
-			System.out.println(ex.getMessage());
-		}
-		finally{
-			try{
-				if(con!=null){
-					con.close();
-				}
-			}
-			catch(Exception ex){
-				System.out.println(ex.getMessage());
-			}
-		}
+            DatabaseBuilder.createTrainReviewTable();           
         }
     
    public String getResults(){
